@@ -1,7 +1,7 @@
 
 # ManiKeys
 
-[image](interface.png)
+![The ui of the app](interface.png)
 ManiKeys is a simple web-based tool that allows typing Manipuri (Meitei Mayek) using a normal English (ABC) keyboard through transliteration rules.
 
 It runs entirely in the browser and requires no installation.
