@@ -6,6 +6,8 @@ ManiKeys is a simple web-based tool that allows typing Manipuri (Meitei Mayek) u
 
 It runs entirely in the browser and requires no installation.
 
+You can access it right now [Here](https://malemsana.github.io/manikeys)
+
 ---
 
 ## Features
