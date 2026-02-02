@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>ManiKeys</title>
+
+<style>
+  body {
+    background: radial-gradient(circle at top, #11162c, #080b18);
+    color: #fff;
+    font-family: system-ui, sans-serif;
+    padding: 20px;
+  }
+
+  h1 {
+    margin-bottom: 12px;
+    font-weight: 600;
+  }
+
+  textarea {
+    width: 100%;
+    height: 130px;
+    font-size: 24px;
+    padding: 12px;
+    margin-bottom: 18px;
+    box-sizing: border-box;
+    border-radius: 6px;
+    border: none;
+    outline: none;
+  }
+
+  button {
+    width: 68px;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #1e2444;
+    border: none;
+    border-radius: 8px;
+    color: #ffffff;
+    font-size: 24px;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  button:hover {
+    background: #2a3170;
+  }
+
+  .layout {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+
+  .leftRail {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .mode select {
+    background: #1a203a;
+    color: white;
+    border: none;
+    padding: 6px 8px;
+    border-radius: 6px;
+    font-size: 14px;
+  }
+
+  .lonsum {
+    display: grid;
+    grid-template-columns: repeat(2, 68px);
+    grid-auto-rows: 52px;
+    gap: 8px;
+  }
+
+  .main {
+    background: #0f1430;
+    padding: 12px;
+    border-radius: 12px;
+  }
+
+  .cheitap {
+    display: grid;
+    grid-template-columns: repeat(8, 68px);
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .keyboard {
+    display: grid;
+    grid-template-columns: repeat(8, 68px);
+    gap: 8px;
+  }
+
+  .space {
+    grid-column: span 5;
+    width: 100%;
+    font-size: 20px;
+  }
+
+  .wide {
+    grid-column: span 2;
+  }
+
+  .punct {
+    background: #1a203a;
+    font-size: 22px;
+  }
+
+  .cheitap button,
+  .lonsum button {
+    background: #1a203a;
+    font-size: 22px;
+  }
+</style>
+</head>
+
+<body>
+
+<h1>ManiKeys</h1>
+
+<textarea id="output" placeholder="Type Manipuri here... (e.g. 'kat', 'kheba')"></textarea>
+
+<div class="layout">
+  <div class="leftRail">
+    <div class="mode">
+      <select id="inputMode">
+        <option value="phonetic">ABC → ꯃꯩꯇꯩ ꯃꯌꯦꯛ</option>
+        <option value="raw">ABC (raw)</option>
+      </select>
+    </div>
+
+    <div class="lonsum" id="lonsum"></div>
+  </div>
+
+  <div class="main">
+    <div class="cheitap" id="cheitap"></div>
+    <div class="keyboard" id="keyboard"></div>
+  </div>
+</div>
+
+<script>
+/* ---------- Elements ---------- */
+const output = document.getElementById("output");
+const cheitapDiv = document.getElementById("cheitap");
+const keyboardDiv = document.getElementById("keyboard");
+const lonsumDiv = document.getElementById("lonsum");
+const inputMode = document.getElementById("inputMode");
+
+/* ---------- Data ---------- */
+
+const cheitapMayek = ["ꯥ","ꯤ","ꯨ","ꯦ","ꯣ","ꯧ","ꯩ","ꯪ"];
+
+const lonsumMayek = [
+  "ꯛ","ꯜ",
+  "ꯠ","ꯟ",
+  "ꯞ","ꯝ",
+  "ꯢ","ꯡ"
+];
+
+const iyekIpee = [
+  "ꯀ","ꯈ","ꯒ","ꯉ","ꯆ","ꯇ","ꯊ","ꯗ",
+  "ꯙ","ꯅ","ꯄ","ꯐ","ꯕ","ꯃ","ꯌ","ꯔ",
+  "ꯂ","ꯋ","ꯁ","ꯍ","ꯎ","ꯏ","ꯑ"
+];
+
+/* 
+  Legacy map kept for reference, but Engine uses strict maps below.
+*/
+const phoneticMap = {
+  kha: "ꯈ", nga: "ꯉ", cha: "ꯆ", tha: "ꯊ", pha: "ꯐ",
+  ka: "ꯀ", ga: "ꯒ", ta: "ꯇ", da: "ꯗ", na: "ꯅ",
+  pa: "ꯄ", ba: "ꯕ", ma: "ꯃ", ya: "ꯌ", ra: "ꯔ",
+  la: "ꯂ", wa: "ꯋ", sa: "ꯁ", ha: "ꯍ",
+  a: "ꯑ", i: "ꯏ", u: "ꯎ", e: "ꯑꯦ", o: "ꯑꯣ"
+};
+
+/* ---------- State ---------- */
+let lastBaseIndex = null;
+let lastBase = null;
+let lastCheitap = null;
+let lastLonsum = null;
+// romanBuffer is now managed inside the Engine Object
+
+/* ---------- Render ---------- */
+function renderCheitap() {
+  cheitapDiv.innerHTML = "";
+  cheitapMayek.forEach(ch => {
+    const b = document.createElement("button");
+    b.textContent = lastBase ? lastBase + ch : ch;
+    b.onclick = () => applyCheitap(ch);
+    cheitapDiv.appendChild(b);
+  });
+}
+
+function renderLonsum() {
+  lonsumDiv.innerHTML = "";
+  lonsumMayek.forEach(ch => {
+    const b = document.createElement("button");
+    b.textContent = lastBase
+      ? lastBase + (lastCheitap || "") + ch
+      : ch;
+    b.onclick = () => applyLonsum(ch);
+    lonsumDiv.appendChild(b);
+  });
+}
+
+/* ---------- Logic ---------- */
+function insertBase(ch) {
+  lastBaseIndex = output.value.length;
+  lastBase = ch;
+  lastCheitap = null;
+  lastLonsum = null;
+  output.value += ch;
+  renderCheitap();
+  renderLonsum();
+  // Physical Engine must sync with this manually if needed, 
+  // but for now UI clicks just reset the engine state
+  Engine.reset(); 
+}
+
+function applyCheitap(ch) {
+  if (!lastBase) return;
+  lastCheitap = ch;
+  lastLonsum = null;
+  output.value =
+    output.value.slice(0, lastBaseIndex) +
+    lastBase +
+    lastCheitap;
+  renderCheitap();
+  renderLonsum();
+  Engine.reset();
+}
+
+function applyLonsum(ch) {
+  if (!lastBase) return;
+  lastLonsum = ch;
+  output.value =
+    output.value.slice(0, lastBaseIndex) +
+    lastBase +
+    (lastCheitap || "") +
+    lastLonsum;
+  renderLonsum();
+  Engine.reset();
+}
+
+function resetState() {
+  lastBaseIndex = null;
+  lastBase = null;
+  lastCheitap = null;
+  lastLonsum = null;
+  renderCheitap();
+  renderLonsum();
+  Engine.reset();
+}
+
+/* ---------- On-screen keyboard ---------- */
+iyekIpee.forEach(ch => {
+  const b = document.createElement("button");
+  b.textContent = ch;
+  b.onclick = () => insertBase(ch);
+  keyboardDiv.appendChild(b);
+});
+
+const space = document.createElement("button");
+space.textContent = "Space";
+space.className = "space";
+space.onclick = () => {
+  output.value += " ";
+  resetState();
+};
+keyboardDiv.appendChild(space);
+
+const cheikhei = document.createElement("button");
+cheikhei.textContent = "꯫";
+cheikhei.className = "punct";
+cheikhei.onclick = () => {
+  output.value += "꯫";
+  resetState();
+};
+keyboardDiv.appendChild(cheikhei);
+
+const back = document.createElement("button");
+back.textContent = "⌫";
+back.className = "wide";
+back.onclick = () => {
+  output.value = output.value.slice(0, -1);
+  resetState();
+};
+keyboardDiv.appendChild(back);
+
+/* ---------- Physical keyboard Engine ---------- */
+
+const Engine = (() => {
+  // 1. Strict Mappings
+  const MAP_BASE = {
+    k: "ꯀ", kh: "ꯈ", g: "ꯒ", gh: "ꯘ", ng: "ꯉ",
+    c: "ꯆ", ch: "ꯆ", j: "ꯖ", jh: "ꯓ",
+    t: "ꯇ", th: "ꯊ", d: "ꯗ", dh: "ꯙ", n: "ꯅ",
+    p: "ꯄ", ph: "ꯐ", b: "ꯕ", bh: "ꯚ", m: "ꯃ",
+    y: "ꯌ", r: "ꯔ", l: "ꯂ", w: "ꯋ", s: "ꯁ", h: "ꯍ",
+    a: "ꯑ", i: "ꯏ", u: "ꯎ" // Independent vowels (start of word)
+  };
+
+  const MAP_VOWEL = {
+    aa: "ꯥ", i: "ꯤ", u: "ꯨ", e: "ꯦ", o: "ꯣ",
+    ei: "ꯩ", ou: "ꯧ", ng: "ꯪ" // ng can be atap (anusvara)
+  };
+
+  const MAP_LONSUM = {
+    k: "ꯛ", l: "ꯜ", t: "ꯠ", n: "ꯟ",
+    p: "ꯞ", m: "ꯝ", i: "ꯢ", ng: "ꯡ"
+  };
+
+  // 2. Engine State
+  let state = {
+    active: false,
+    romanRaw: "",      // "k", "kh", "t"
+    type: null,        // 'base', 'cheitap', 'lonsum'
+    token: null,       // The actual Mayek char displayed
+    inherent: false    // If true, we are sitting on an inherent 'a'
+  };
+
+  function reset() {
+    state = { active: false, romanRaw: "", type: null, token: null, inherent: false };
+  }
+
+  // 3. Helper: Replace text in textarea
+  function replaceLast(count, newStr) {
+    const start = output.value.length - count;
+    if (start < 0) return;
+    output.value = output.value.slice(0, start) + newStr;
+  }
+
+  function handleInput(key) {
+    // A. Commit Triggers: Space or Punctuation
+    if (!/^[a-zA-Z]$/.test(key)) {
+      reset();
+      return false; // Allow default behavior
+    }
+
+    // B. Logic Branching
+    
+    // 1. Is it a VOWEL?
+    if (/[aeiou]/.test(key)) {
+      // Case 1.1: Reinterpretation (Lonsum -> Base)
+      // e.g. "kat" (ꯀꯠ) + "a" -> "kata" (ꯀꯇ)
+      if (state.active && state.type === 'lonsum') {
+        const prevRoman = state.romanRaw; // e.g. "t"
+        // Can "t" be a base? Yes.
+        if (MAP_BASE[prevRoman]) {
+          // Remove Lonsum
+          replaceLast(state.token.length, "");
+          
+          // Insert Base instead
+          const newBase = MAP_BASE[prevRoman];
+          output.value += newBase;
+          
+          // Update State to be on this new Base
+          state = { 
+            active: true, 
+            romanRaw: prevRoman, 
+            type: 'base', 
+            token: newBase, 
+            inherent: true 
+          };
+          
+          // Now process the 'a' or vowel against this new base
+          // Recursive call? Or just flow down? Flow down is safer.
+          // Fall through to standard vowel handling below...
+        }
+      }
+
+      // Case 1.2: Normal Vowel Application
+      if (state.active && (state.type === 'base' || state.type === 'cheitap')) {
+        
+        // Special: 'a' just confirms inherent vowel (do nothing visual)
+        if (key === 'a') {
+          // If we previously had 'a', 'aa' makes ꯥ
+          if (state.inherent && key === 'a') {
+             // We are currently 'a' (inherent), user typed 'a' again -> 'aa'
+             replaceLast(0, "ꯥ"); // Add atap
+             state.type = 'cheitap';
+             state.token = "ꯥ";
+             state.inherent = false;
+             state.romanRaw = "aa";
+          } else {
+             // First 'a', do nothing but note we are inherent
+             // (If we were already inherent, this keeps us inherent)
+             state.inherent = true; 
+          }
+          return true; // Consumed
+        }
+
+        // Other vowels (i, u, e, o)
+        const v = MAP_VOWEL[key];
+        if (v) {
+          output.value += v;
+          state.type = 'cheitap';
+          state.token = v;
+          state.romanRaw = key;
+          state.inherent = false;
+          return true;
+        }
+      }
+      
+      // Case 1.3: Start of word/syllable (Independent Vowel)
+      // If we are not active, or just finished a syllable
+      const indep = MAP_BASE[key]; // a->ꯑ, i->ꯏ
+      if (indep) {
+        output.value += indep;
+        state = { 
+          active: true, 
+          romanRaw: key, 
+          type: 'base', 
+          token: indep, 
+          inherent: (key === 'a') 
+        };
+        // Update global lastBase for UI sync
+        lastBase = indep; renderCheitap(); renderLonsum();
+        return true;
+      }
+    }
+
+    // 2. Is it a CONSONANT?
+    else {
+      // Case 2.1: Digraph / Continuation (e.g. k -> kh, t -> th)
+      if (state.active) {
+        const combined = state.romanRaw + key;
+        
+        // Try mapping as Base (k + h -> kh)
+        if (state.type === 'base' && MAP_BASE[combined]) {
+          const newMayek = MAP_BASE[combined];
+          replaceLast(state.token.length, newMayek);
+          
+          state.romanRaw = combined;
+          state.token = newMayek;
+          // type remains 'base'
+          
+          // UI Sync
+          lastBase = newMayek; renderCheitap(); renderLonsum();
+          return true;
+        }
+        
+        // Try mapping as Lonsum extension? (Rare, maybe ng -> ꯡ)
+        // Usually lonsums are single key, but 'ng' is digraph lonsum.
+        if (state.type === 'lonsum' && MAP_LONSUM[combined]) {
+           const newLonsum = MAP_LONSUM[combined];
+           replaceLast(state.token.length, newLonsum);
+           state.romanRaw = combined;
+           state.token = newLonsum;
+           return true;
+        }
+      }
+
+      // Case 2.2: Tentative Lonsum (Closing the syllable)
+      // Must follow a Base or Cheitap
+      if (state.active && (state.type === 'base' || state.type === 'cheitap' || state.inherent)) {
+        if (MAP_LONSUM[key]) {
+          const lonsum = MAP_LONSUM[key];
+          output.value += lonsum;
+          state.type = 'lonsum';
+          state.token = lonsum;
+          state.romanRaw = key;
+          state.inherent = false;
+          return true;
+        }
+      }
+
+      // Case 2.3: New Base (Start new syllable)
+      // If we couldn't be a digraph or a lonsum, we commit previous and start new.
+      const base = MAP_BASE[key];
+      if (base) {
+        output.value += base;
+        state = { 
+          active: true, 
+          romanRaw: key, 
+          type: 'base', 
+          token: base, 
+          inherent: true 
+        };
+        // UI Sync
+        lastBase = base; lastBaseIndex = output.value.length - base.length; 
+        renderCheitap(); renderLonsum();
+        return true;
+      }
+    }
+
+    // Fallback: If nothing matched, reset and let raw char pass?
+    // Prompt says: "Every Roman key typed... must appear... removed only when valid mapping".
+    // If we reached here, we found a valid mapping or we started a new base.
+    // If input is 'x' (no mapping), we allow it.
+    reset();
+    return false; // Let browser insert 'x'
+  }
+
+  return { handleInput, reset };
+})();
+
+/* ---------- Event Listeners ---------- */
+
+output.addEventListener("keydown", (e) => {
+  // 1. Prerequisites
+  if (inputMode.value !== "phonetic") return;
+  if (e.ctrlKey || e.altKey || e.metaKey) return;
+  if (e.key === "Shift" || e.key === "CapsLock") return;
+
+  // 2. Backspace (Reset State)
+  if (e.key === "Backspace") {
+    // Default browser backspace handles text removal
+    // We just ensure engine forgets previous context
+    Engine.reset();
+    resetState(); // Clear UI highlighting variables
+    return;
+  }
+
+  // 3. Process Printable Keys
+  if (e.key.length === 1) {
+    // A. Show Immediately (Manual Insertion)
+    e.preventDefault(); 
+    
+    // Insert the Roman key visual
+    // Note: We insert it first, then Engine decides to keep it, 
+    // remove it, or replace it.
+    // Actually, to satisfy "Show immediately, revise when proven wrong":
+    // If the engine returns TRUE (mapped), the engine handles the output manipulation.
+    // If the engine returns FALSE (unmapped), we insert the raw key.
+    
+    const mapped = Engine.handleInput(e.key.toLowerCase());
+    
+    if (!mapped) {
+      // No map found (e.g. 'z', 'q'), just insert raw
+      output.value += e.key;
+    }
+    
+    // Scroll to bottom/end
+    output.scrollTop = output.scrollHeight;
+  }
+});
+
+/* ---------- Init ---------- */
+renderCheitap();
+renderLonsum();
+</script>
+
+</body>
+</html>
